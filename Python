@@ -1,0 +1,58 @@
+import serial
+import threading
+import time
+
+puerto = '/dev/ttyACM0'
+baudios = 9600
+
+ejecutando = True
+
+def leer_arduino(ser):
+    while ejecutando:
+        if ser.in_waiting > 0:
+            linea = ser.readline().decode('utf-8').strip()
+            if linea.isdigit():
+                print(f"[Sensor] Valor: {linea}")
+            else:
+                print(f"[Arduino] {linea}")
+        time.sleep(0.1)
+
+def enviar_comandos(ser):
+    global ejecutando
+    print("\nComandos:")
+    print("1 = LED verde")
+    print("2 = LED rojo")
+    print("3 = Secuencia verde-amarillo-rojo")
+    print("exit = salir\n")
+
+    while ejecutando:
+        cmd = input(">> ").strip()
+        if cmd == "exit":
+            ejecutando = False
+        elif cmd in ["1", "2", "3"]:
+            ser.write(f"{cmd}\n".encode())
+        else:
+            print("Comando inválido.")
+
+try:
+    ser = serial.Serial(puerto, baudios, timeout=1)
+    time.sleep(2)  # Espera que Arduino reinicie y esté listo
+    print(f"[Info] Conectado a {puerto} a {baudios} baudios.")
+
+    hilo_lectura = threading.Thread(target=leer_arduino, args=(ser,))
+    hilo_lectura.start()
+
+    enviar_comandos(ser)
+
+except serial.SerialException as e:
+    print(f"[Error] No se pudo abrir el puerto: {e}")
+
+except KeyboardInterrupt:
+    print("\n[Info] Programa interrumpido por usuario.")
+
+finally:
+    ejecutando = False
+    time.sleep(0.5)
+    if 'ser' in locals() and ser.is_open:
+        ser.close()
+    print("[Info] Programa finalizado.")
